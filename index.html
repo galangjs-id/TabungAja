@@ -31,29 +31,63 @@
         <div class="brand-sub">KELOLA UANGMU</div>
       </div>
     </div>
-    <div class="menu-wrap">
-      <button class="reset-btn menu-btn" onclick="toggleMenuPopup()" title="Menu"><i class="fa-solid fa-ellipsis-vertical"></i></button>
-      <div class="menu-popup" id="menuPopup">
-        <button class="menu-item" onclick="closeMenuPopup(); openAccountSheet();">
-          <i class="fa-solid fa-user"></i> Akun
-          <span class="toggle-state" id="accountMenuState">Belum Login</span>
-        </button>
-        <button class="menu-item" onclick="toggleDarkMode()">
-          <i class="fa-solid fa-moon" id="darkModeIcon"></i> Mode Gelap
-          <span class="toggle-state" id="darkModeState">Off</span>
-        </button>
-        <a class="menu-item" href="https://t.me/lanzzx1" target="_blank" rel="noopener noreferrer" onclick="closeMenuPopup()">
-          <i class="fa-solid fa-headset"></i> Developer
-        </a>
-        <button class="menu-item" onclick="closeMenuPopup(); openInstallHelp();">
-          <i class="fa-brands fa-android"></i> Download App
-        </button>
-        <button class="menu-item danger" onclick="closeMenuPopup(); openResetSheet();">
-          <i class="fa-solid fa-arrow-rotate-left"></i> Reset Data
-        </button>
+    <button class="reset-btn menu-btn" id="menuBtn" type="button" onclick="openSidebar()" aria-label="Buka menu" aria-controls="sidebar" aria-expanded="false"><i class="fa-solid fa-bars-staggered"></i></button>
+  </div>
+</div>
+
+<div class="sb-overlay" id="sbOverlay" onclick="closeSidebar()"></div>
+<aside class="sidebar" id="sidebar" aria-label="Menu" aria-hidden="true" inert>
+  <div class="sb-head">
+    <div class="brand">
+      <div class="brand-mark"><i class="fa-solid fa-wallet"></i></div>
+      <div>
+        <div class="brand-name">Tabungaja</div>
+        <div class="brand-sub">KELOLA UANGMU</div>
       </div>
     </div>
+    <button class="reset-btn menu-btn" type="button" onclick="closeSidebar()" aria-label="Tutup menu"><i class="fa-solid fa-xmark"></i></button>
   </div>
+
+  <button class="sb-account" type="button" onclick="closeSidebar(); openAccountSheet();">
+    <span class="sb-avatar"><i class="fa-solid fa-user"></i></span>
+    <span class="sb-account-text">
+      <span class="sb-account-name" id="accountMenuState">Belum Login</span>
+      <span class="sb-account-sub">Kelola akun &amp; sinkronisasi</span>
+    </span>
+    <i class="fa-solid fa-chevron-right sb-chev"></i>
+  </button>
+
+  <nav class="sb-list">
+    <button class="sb-item" type="button" role="switch" aria-checked="false" id="darkModeBtn" onclick="toggleDarkMode()">
+      <i class="fa-solid fa-moon" id="darkModeIcon"></i>
+      <span class="sb-label">Mode gelap</span>
+      <span class="sb-switch" aria-hidden="true"></span>
+      <span id="darkModeState" class="sb-hidden">Off</span>
+    </button>
+    <button class="sb-item" type="button" onclick="closeSidebar(); openInstallHelp();">
+      <i class="fa-brands fa-android"></i>
+      <span class="sb-label">Download app</span>
+      <span class="sb-tag" id="installMenuState"></span>
+    </button>
+    <a class="sb-item" href="https://t.me/lanzzx1" target="_blank" rel="noopener noreferrer" onclick="closeSidebar()">
+      <i class="fa-solid fa-headset"></i>
+      <span class="sb-label">Developer</span>
+      <i class="fa-solid fa-arrow-up-right-from-square sb-ext"></i>
+    </a>
+  </nav>
+
+  <div class="sb-foot">
+    <button class="sb-item danger" type="button" onclick="closeSidebar(); openResetSheet();">
+      <i class="fa-solid fa-arrow-rotate-left"></i>
+      <span class="sb-label">Reset data</span>
+    </button>
+  </div>
+</aside>
+
+<div class="update-bar" id="updateBar" role="status" aria-live="polite">
+  <span>Versi baru tersedia.</span>
+  <button type="button" onclick="reloadForUpdate()">Muat ulang</button>
+  <button type="button" class="ub-x" onclick="hideUpdateBar()" aria-label="Tutup"><i class="fa-solid fa-xmark"></i></button>
 </div>
 
 <div class="wrap">
