@@ -21,12 +21,5 @@
       "type": "image/png",
       "purpose": "any"
     }
-  ],
-  "id": "./index.html",
-  "related_applications": [
-    {
-      "platform": "webapp",
-      "url": "https://tabungaja.vercel.app/manifest.json"
-    }
   ]
 }

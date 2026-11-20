@@ -221,52 +221,16 @@ function submitGoal(e){
   render();
 }
 
-// ---------- Sidebar (drawer kanan) ----------
-const sbEl = document.getElementById('sidebar');
-const sbOverlay = document.getElementById('sbOverlay');
-const sbBtn = document.getElementById('menuBtn');
-function openSidebar(){
-  sbEl.removeAttribute('inert'); sbEl.setAttribute('aria-hidden', 'false');
-  sbEl.style.transform = '';
-  sbEl.classList.add('open'); sbOverlay.classList.add('open');
-  sbBtn.setAttribute('aria-expanded', 'true');
-  const first = sbEl.querySelector('.sb-account'); if(first) first.focus({ preventScroll: true });
+function toggleMenuPopup(){
+  document.getElementById('menuPopup').classList.toggle('open');
 }
-function closeSidebar(){
-  if(!sbEl.classList.contains('open')) return;
-  sbEl.classList.remove('open'); sbOverlay.classList.remove('open');
-  sbEl.style.transform = '';
-  sbEl.setAttribute('aria-hidden', 'true'); sbEl.setAttribute('inert', '');
-  sbBtn.setAttribute('aria-expanded', 'false');
-  sbBtn.focus({ preventScroll: true });
+function closeMenuPopup(){
+  document.getElementById('menuPopup').classList.remove('open');
 }
-document.addEventListener('keydown', (e) => { if(e.key === 'Escape') closeSidebar(); });
-// geser ke kanan buat nutup
-(function sidebarSwipe(){
-  let x0 = null, y0 = 0, dx = 0, locked = false;
-  sbEl.addEventListener('touchstart', (e) => {
-    const t = e.touches[0]; x0 = t.clientX; y0 = t.clientY; dx = 0; locked = false;
-  }, { passive: true });
-  sbEl.addEventListener('touchmove', (e) => {
-    if(x0 === null) return;
-    const t = e.touches[0]; const mx = t.clientX - x0, my = t.clientY - y0;
-    if(!locked){
-      if(Math.abs(my) > 10 && Math.abs(my) > Math.abs(mx)){ x0 = null; return; }
-      if(Math.abs(mx) > 10) locked = true; else return;
-    }
-    dx = Math.max(0, mx);
-    sbEl.classList.add('dragging');
-    sbEl.style.transform = 'translateX(' + dx + 'px)';
-  }, { passive: true });
-  const end = () => {
-    if(x0 === null) return;
-    const w = sbEl.offsetWidth; x0 = null;
-    sbEl.classList.remove('dragging');
-    if(dx > w * 0.3) closeSidebar(); else sbEl.style.transform = '';
-  };
-  sbEl.addEventListener('touchend', end);
-  sbEl.addEventListener('touchcancel', end);
-})();
+document.addEventListener('click', (e) => {
+  const wrap = document.querySelector('.menu-wrap');
+  if(wrap && !wrap.contains(e.target)) closeMenuPopup();
+});
 function openResetSheet(){
   document.getElementById('resetOverlay').classList.add('open');
 }
@@ -609,11 +573,13 @@ function applyTheme(theme){
   document.body.setAttribute('data-theme', theme);
   const icon = document.getElementById('darkModeIcon');
   const state = document.getElementById('darkModeState');
-  const btn = document.getElementById('darkModeBtn');
-  const dark = theme === 'dark';
-  if(icon) icon.className = dark ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
-  if(state) state.textContent = dark ? 'On' : 'Off';
-  if(btn) btn.setAttribute('aria-checked', dark ? 'true' : 'false');
+  if(theme === 'dark'){
+    icon.className = 'fa-solid fa-sun';
+    state.textContent = 'On';
+  } else {
+    icon.className = 'fa-solid fa-moon';
+    state.textContent = 'Off';
+  }
   if(document.getElementById('trendChart') && typeof txns !== 'undefined' && txns) renderChart();
 }
 function toggleDarkMode(){
@@ -1021,114 +987,59 @@ fetch('msg.json', { cache: 'no-store' })
   .catch(err => console.error('Gagal ambil msg.json:', err));
 
 // ============================= //
-// PWA: service worker + auto update
+// PWA: service worker + custom install banner
 // ============================= //
-let swReg = null;
-const updateBar = document.getElementById('updateBar');
-function showUpdateBar(){ updateBar.classList.add('show'); }
-function hideUpdateBar(){ updateBar.classList.remove('show'); }
-let reloadingForUpdate = false;
-function reloadForUpdate(){ reloadingForUpdate = true; location.reload(); }
-
 if ('serviceWorker' in navigator) {
-  // controllerchange pertama (install awal) bukan update -> jangan munculin bar
-  const hadController = !!navigator.serviceWorker.controller;
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (!hadController || reloadingForUpdate) return;
-    showUpdateBar();
-  });
-
-  const checkUpdate = () => { if (swReg) swReg.update().catch(() => {}); };
-
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js')
-      .then((r) => {
-        swReg = r;
-        checkUpdate();
-        // ada versi yang udah ke-download tapi belum aktif
-        if (r.waiting && hadController) showUpdateBar();
-      })
-      .catch((err) => console.error('SW register failed:', err));
+    navigator.serviceWorker.register('sw.js').catch(err => console.error('SW register failed:', err));
   });
-
-  // cek update tiap app dibuka lagi dari background, dan tiap 30 menit selama kebuka
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) { checkUpdate(); refreshInstallState(); } });
-  setInterval(() => { if (!document.hidden) checkUpdate(); }, 30 * 60 * 1000);
 }
 
 // ============================= //
-// Install PWA — status install dicek ulang tiap saat, bukan disimpen permanen.
-// - isStandalone()          : app lagi dibuka dari ikon yang keinstall
-// - beforeinstallprompt     : browser cuma ngirim ini kalau app BELUM terinstall,
-//                             jadi kalau event ini muncul = app udah di-uninstall
-// - getInstalledRelatedApps : tau app terinstall walau dibuka dari tab browser
+// Install PWA — cuma lewat menu "Download App", gak ada notif otomatis.
+// Event beforeinstallprompt tetep ditangkap diam-diam biar siap dipakai
+// begitu user pencet menu-nya.
 // ============================= //
 let deferredInstallPrompt = null;
-let relatedInstalled = false;
-let justInstalled = false;
 
-try { localStorage.removeItem('pwa_installed_v2'); } catch (e) {}  // flag lama yang bikin status nyangkut
+const PWA_INSTALLED_KEY = 'pwa_installed_v2';
 
 function isStandalone(){
   return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
 }
+
+// isStandalone() cuma true kalau app-nya lagi dibuka DARI ikon yang keinstall.
+// Kalau user buka dari tab browser biasa (padahal udah pernah install sebelumnya),
+// isStandalone() bakal false terus — makanya dikombinasi sama flag yang disimpen
+// pas event 'appinstalled' kejadian, biar tetep kedeteksi "udah terinstall".
 function isInstalled(){
-  if (deferredInstallPrompt) return false;
-  return isStandalone() || relatedInstalled || justInstalled;
-}
-function updateInstallUI(){
-  const el = document.getElementById('installMenuState');
-  if (!el) return;
-  const ok = isInstalled();
-  el.textContent = ok ? 'Terinstall' : '';
-  el.classList.toggle('ok', ok);
-}
-async function refreshInstallState(){
-  if (navigator.getInstalledRelatedApps) {
-    try {
-      const apps = await navigator.getInstalledRelatedApps();
-      relatedInstalled = apps.length > 0;
-    } catch (e) { relatedInstalled = false; }
-  }
-  updateInstallUI();
+  return isStandalone() || localStorage.getItem(PWA_INSTALLED_KEY) === '1';
 }
 
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferredInstallPrompt = e;
-  relatedInstalled = false;
-  justInstalled = false;
-  updateInstallUI();
 });
 
 window.addEventListener('appinstalled', () => {
   deferredInstallPrompt = null;
-  justInstalled = true;
-  updateInstallUI();
+  localStorage.setItem(PWA_INSTALLED_KEY, '1');
 });
-
-window.addEventListener('load', refreshInstallState);
-updateInstallUI();
 
 function openInstallHelp(){
   const textEl = document.getElementById('installHelpText');
   const btnRow = document.getElementById('installHelpButtons');
-  const btnOk = '<button type="button" class="reset-confirm-btn" style="flex:1; background:var(--text); color:var(--bg);" onclick="closeInstallHelp()">Oke</button>';
 
   if (isInstalled()){
-    textEl.textContent = isStandalone()
-      ? 'Tabungaja sedang dijalankan sebagai aplikasi.'
-      : 'Tabungaja sudah terinstall di perangkat kamu. Buka lewat ikon di layar utama.';
-    btnRow.innerHTML = btnOk;
-  } else if (deferredInstallPrompt){
-    textEl.textContent = 'Install sekarang supaya Tabungaja bisa dibuka cepat dan tetap jalan tanpa internet.';
-    btnRow.innerHTML =
-      '<button type="button" class="reset-confirm-btn" style="flex:1; background:var(--surface); color:var(--text); border:1px solid var(--border);" onclick="closeInstallHelp()">Nanti</button>' +
-      '<button type="button" class="reset-confirm-btn" style="flex:1; background:var(--income);" onclick="confirmInstall()">Install</button>';
+    textEl.innerHTML = 'Tabungaja sudah ada di perangkat kamu.';
+    btnRow.innerHTML = '<button type="button" class="reset-confirm-btn" style="flex:1; background:var(--text); color:var(--bg);" onclick="closeInstallHelp()">Oke</button>';
   } else {
-    textEl.textContent = 'Buka menu titik tiga di browser kamu, lalu pilih "Tambahkan ke Layar Utama" (Add to Home Screen).';
-    btnRow.innerHTML = btnOk;
+    textEl.innerHTML = 'Install sekarang untuk akses yang lebih cepat.';
+    btnRow.innerHTML =
+      '<button type="button" class="reset-confirm-btn" style="flex:1; background:var(--surface); color:var(--text); border:1px solid var(--border);" onclick="closeInstallHelp()">Batal</button>' +
+      '<button type="button" class="reset-confirm-btn" style="flex:1; background:var(--income);" onclick="confirmInstall()">Install</button>';
   }
+
   document.getElementById('installHelpOverlay').classList.add('open');
 }
 function closeInstallHelp(){
@@ -1139,11 +1050,10 @@ document.getElementById('installHelpOverlay').addEventListener('click', (e) => {
 });
 
 async function confirmInstall(){
+  if (!deferredInstallPrompt) { closeInstallHelp(); return; }
   closeInstallHelp();
-  if (!deferredInstallPrompt) return;
-  const p = deferredInstallPrompt;
-  p.prompt();
-  await p.userChoice;       // sukses/batal ditangani 'appinstalled' & beforeinstallprompt
+  deferredInstallPrompt.prompt();
+  const choice = await deferredInstallPrompt.userChoice;
+  if (choice.outcome === 'accepted') localStorage.setItem(PWA_INSTALLED_KEY, '1');
   deferredInstallPrompt = null;
-  updateInstallUI();
 }
